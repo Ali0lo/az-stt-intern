@@ -181,8 +181,8 @@ python part_b/compare_models.py \
 
 | Model | Avg WER | Avg CER | Samples |
 |-------|---------|---------|---------|
-| whisper-small (baseline) | `[FILL]`% | `[FILL]`% | 50 |
-| whisper-tiny (fine-tuned) | `[FILL]`% | `[FILL]`% | 50 |
+| whisper-small (baseline) | `xx`% | `xx`% | 50 |
+| whisper-tiny (fine-tuned) | `xx`% | `xx`% | 50 |
 
 ---
 
