@@ -105,12 +105,13 @@ Aşağıdakı nəticələr hazırda ilkin yoxlama üçün `google/fleurs` datase
 
 ### 50 nümunə üçün nəticə cədvəli
 
-Final qiymətləndirmə üçün eyni script `--max_samples 50` ilə işə salınmalıdır. Nəticələr alındıqdan sonra aşağıdakı cədvəl yenilənməlidir.
+Final qiymətləndirmə üçün eyni script `--max_samples 50` ilə işə salına bilər. Hazırda yalnız 3 nümunəlik ilkin baseline nəticəsi icra edilmişdir; 50 nümunəlik baseline və fine-tuning nəticələri hələ icra edilməyib.
 
 | Model | Dataset | Split | Nümunə sayı | Ortalama WER | Ortalama CER |
 |------|---------|-------|-------------:|--------------:|--------------:|
-| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 50 | Yenilənəcək | Yenilənəcək |
-| `openai/whisper-tiny` fine-tuned | `google/fleurs` (`az_az`) | `test` | 50 | Yenilənəcək | Yenilənəcək |
+| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 3 | **35.70%** | **7.67%** |
+| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
+| `openai/whisper-tiny` fine-tuned | `google/fleurs` (`az_az`) | `test` | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
 
 ### Qısa nəticə analizi
 
@@ -132,8 +133,9 @@ Fine-tuning mərhələsində `openai/whisper-tiny` modeli kiçik train subset ü
 
 | Model | Fine-tuning statusu | Test nümunə sayı | WER | CER |
 |------|----------------------|-----------------:|----:|----:|
-| `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 50 | Yenilənəcək | Yenilənəcək |
-| `openai/whisper-tiny` | 200 train nümunəsi üzərində fine-tune edilir | 50 | Yenilənəcək | Yenilənəcək |
+| `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 3 | **35.70%** | **7.67%** |
+| `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
+| `openai/whisper-tiny` | 200 train nümunəsi üzərində fine-tune edilir | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
 
 ### Gözlənilən müşahidə
 
