@@ -97,36 +97,39 @@ Bu dataset Azərbaycan dili üçün oxunmuş nitq nümunələrindən ibarətdir 
 
 ## 5. WER/CER Nəticələri
 
-Aşağıdakı nəticələr hazırda ilkin yoxlama üçün `google/fleurs` datasetinin `az_az` konfiqurasiyasından götürülmüş **3 test nümunəsi** üzərində hesablanmışdır.
+Aşağıdakı nəticələr `google/fleurs` datasetinin `az_az` konfiqurasiyasında `test` splitindən götürülmüş **50 nümunə** üzərində hesablanmışdır.
 
 | Model | Dataset | Split | Nümunə sayı | Ortalama WER | Ortalama CER |
 |------|---------|-------|-------------:|--------------:|--------------:|
-| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 3 | **35.70%** | **7.67%** |
-
-### 50 nümunə üçün nəticə cədvəli
-
-Final qiymətləndirmə üçün eyni script `--max_samples 50` ilə işə salına bilər. Hazırda yalnız 3 nümunəlik ilkin baseline nəticəsi icra edilmişdir; 50 nümunəlik baseline və fine-tuning nəticələri hələ icra edilməyib.
-
-| Model | Dataset | Split | Nümunə sayı | Ortalama WER | Ortalama CER |
-|------|---------|-------|-------------:|--------------:|--------------:|
-| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 3 | **35.70%** | **7.67%** |
-| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
-| `openai/whisper-tiny` fine-tuned | `google/fleurs` (`az_az`) | `test` | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
+| `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 50 | **51.01%** | **15.29%** |
 
 ### Qısa nəticə analizi
 
-İlkin 3 nümunəlik nəticədə WER `35.70%`, CER isə `7.67%` olmuşdur. CER-in WER-dən xeyli aşağı olması onu göstərir ki, model bir çox sözləri tam səhv tanımır, daha çox fonetik və yazılış səviyyəsində kiçik səhvlər edir.
+50 nümunəlik baseline test nəticəsində `openai/whisper-small` modeli üçün orta **WER 51.01%**, orta **CER isə 15.29%** olmuşdur.
 
-Məsələn, model bəzi hallarda Azərbaycan dilinə xas səsləri və yaxın fonetik formaları qarışdıra bilir:
+Bu nəticə göstərir ki, model ümumi cümlə strukturunu müəyyən qədər tanıya bilir, lakin Azərbaycan dilində söz səviyyəsində hələ nəzərəçarpacaq səhvlər edir. CER göstəricisinin WER-dən xeyli aşağı olması onu göstərir ki, model bir çox hallarda sözü tamamilə itirmir, daha çox fonetik və yazılış baxımından yaxın formalar yaradır.
 
-- `elm` → `elim`
-- `xüsusilə` → `süsilə`
-- `dırnaqları` → `dırnaxlar`
+### Ən yaxşı 5 nümunə
 
-Bu tip səhvlər Azərbaycan dili üçün ASR sistemlərində gözləniləndir.
+| ID | WER | CER |
+|----|----:|----:|
+| 9  | 25.0% | 14.5% |
+| 11 | 26.3% | 8.4% |
+| 0  | 27.3% | 7.7% |
+| 34 | 30.0% | 5.4% |
+| 39 | 30.0% | 8.6% |
+
+### Ən pis 5 nümunə
+
+| ID | WER | CER |
+|----|----:|----:|
+| 7  | 75.0% | 21.8% |
+| 5  | 71.7% | 35.2% |
+| 21 | 71.7% | 38.4% |
+| 25 | 71.4% | 36.1% |
+| 26 | 68.8% | 19.1% |
 
 ---
-
 ## 6. Fine-tuning Nəticəsinin Müqayisəsi
 
 Fine-tuning mərhələsində `openai/whisper-tiny` modeli kiçik train subset üzərində öyrədilir və daha sonra eyni test nümunələri üzərində baza model ilə müqayisə olunur.
