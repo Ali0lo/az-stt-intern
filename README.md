@@ -132,13 +132,16 @@ Bu nəticə göstərir ki, model ümumi cümlə strukturunu müəyyən qədər t
 ---
 ## 6. Fine-tuning Nəticəsinin Müqayisəsi
 
-Fine-tuning mərhələsində `openai/whisper-tiny` modeli kiçik train subset üzərində öyrədilir və daha sonra eyni test nümunələri üzərində baza model ilə müqayisə olunur.
+Fine-tuning mərhələsində `openai/whisper-tiny` modelinin kiçik train subset üzərində öyrədilməsi planlaşdırılmışdır. Hazırda baseline qiymətləndirmə tamamlanmış, fine-tuning müqayisə nəticələri isə hələ əldə olunmamışdır.
 
 | Model | Fine-tuning statusu | Test nümunə sayı | WER | CER |
 |------|----------------------|-----------------:|----:|----:|
-| `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 3 | **35.70%** | **7.67%** |
-| `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
-| `openai/whisper-tiny` | 200 train nümunəsi üzərində fine-tune edilir | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
+| `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 50 | **51.01%** | **15.29%** |
+| `openai/whisper-tiny` | Fine-tuning mərhələsi planlaşdırılıb / hələ icra edilməyib | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
+
+### Qeyd
+
+Bu layihədə baseline mərhələsi uğurla icra edilmişdir. Fine-tuning hissəsi üçün ayrıca training, validation və müqayisə nəticələri əldə edildikdən sonra bu cədvəl yenilənə bilər.
 
 ### Gözlənilən müşahidə
 
