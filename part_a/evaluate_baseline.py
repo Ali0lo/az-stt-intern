@@ -169,7 +169,7 @@ def main():
         args.dataset_name,
         args.language,
         split=args.split,
-        trust_remote_code=True,
+        trust_remote_code=False,
     )
 
     # Limit to max_samples
@@ -189,7 +189,7 @@ def main():
     results = []
 
     for idx, sample in enumerate(tqdm(dataset, total=total, desc="Evaluating")):
-        reference_raw = sample.get("sentence", "")
+        reference_raw = sample.get("transcription", sample.get("sentence", "")) 
         duration = get_audio_duration(sample)
 
         try:
