@@ -97,11 +97,12 @@ Bu dataset Azərbaycan dili üçün oxunmuş nitq nümunələrindən ibarətdir 
 
 ## 5. WER/CER Nəticələri
 
-Aşağıdakı nəticələr `google/fleurs` datasetinin `az_az` konfiqurasiyasında `test` splitindən götürülmüş **50 nümunə** üzərində hesablanmışdır.
+Aşağıdakı nəticələr `google/fleurs` datasetinin `az_az` konfiqurasiyasında `test` splitindən götürülmüş 50 nümunə üzərində hesablanmışdır.
 
 | Model | Dataset | Split | Nümunə sayı | Ortalama WER | Ortalama CER |
 |------|---------|-------|-------------:|--------------:|--------------:|
 | `openai/whisper-small` baseline | `google/fleurs` (`az_az`) | `test` | 50 | **51.01%** | **15.29%** |
+| `openai/whisper-tiny` fine-tuned | `google/fleurs` (`az_az`) | `test` | 50 | **84.66%** | **34.61%** |
 
 ### Qısa nəticə analizi
 
@@ -132,16 +133,23 @@ Bu nəticə göstərir ki, model ümumi cümlə strukturunu müəyyən qədər t
 ---
 ## 6. Fine-tuning Nəticəsinin Müqayisəsi
 
-Fine-tuning mərhələsində `openai/whisper-tiny` modelinin kiçik train subset üzərində öyrədilməsi planlaşdırılmışdır. Hazırda baseline qiymətləndirmə tamamlanmış, fine-tuning müqayisə nəticələri isə hələ əldə olunmamışdır.
+Fine-tuning mərhələsində `openai/whisper-tiny` modeli `google/fleurs` datasetinin Azərbaycan dili (`az_az`) hissəsindən götürülmüş 50 train nümunəsi üzərində 3 epoch fine-tune edilmişdir. Daha sonra model eyni `test` splitindən götürülmüş 50 nümunə üzərində qiymətləndirilmişdir.
 
 | Model | Fine-tuning statusu | Test nümunə sayı | WER | CER |
 |------|----------------------|-----------------:|----:|----:|
 | `openai/whisper-small` | Fine-tune edilməyib, zero-shot baseline | 50 | **51.01%** | **15.29%** |
-| `openai/whisper-tiny` | Fine-tuning mərhələsi planlaşdırılıb / hələ icra edilməyib | 50 | Hələ icra edilməyib | Hələ icra edilməyib |
+| `openai/whisper-tiny` | 50 train nümunəsi üzərində 3 epoch fine-tune edilib | 50 | **84.66%** | **34.61%** |
 
-### Qeyd
+### Müqayisə Analizi
 
-Bu layihədə baseline mərhələsi uğurla icra edilmişdir. Fine-tuning hissəsi üçün ayrıca training, validation və müqayisə nəticələri əldə edildikdən sonra bu cədvəl yenilənə bilər.
+Fine-tuning nəticəsində `whisper-tiny` modeli baza `whisper-small` modelindən daha zəif nəticə göstərmişdir. Bunun əsas səbəbləri bunlardır:
+
+- `whisper-tiny` modeli `whisper-small` modelindən daha kiçikdir və daha az parametrə malikdir.
+- Fine-tuning yalnız 50 train nümunəsi üzərində aparılmışdır.
+- Kiçik dataset modelin ümumiləşdirmə qabiliyyətini artırmaq üçün kifayət etmir.
+- Validation WER fine-tuning zamanı yüksək qalmışdır, bu da modelin Azərbaycan dili üçün hələ stabil öyrənmədiyini göstərir.
+
+Bu nəticə state-of-the-art performans məqsədi daşımır. Əsas məqsəd fine-tuning pipeline-ının texniki olaraq qurulmasını, validation WER-in izlənməsini, checkpoint saxlanmasını və baza model ilə müqayisənin aparılmasını göstərməkdir.
 
 ### Gözlənilən müşahidə
 
