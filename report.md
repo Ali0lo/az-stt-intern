@@ -1,267 +1,228 @@
-# Azərbaycan Dilinin Avtomatik Nitq Tanıma Sistemi — Texniki Hesabat
+# Azərbaycan Dili üçün Nitq Tanıma Sistemi — Analitik Hesabat
 
-**Layihə:** az-stt-intern  
-**Model:** OpenAI Whisper (small + tiny)  
-**Dataset:** Mozilla Common Voice 17.0 (az)  
-**Tarix:** 2024
+**Layihə:** `az-stt-intern`  
+**Tapşırıq:** AI Engineer Intern texniki tapşırığı  
+**Mövzu:** Azərbaycan dili üçün Automatic Speech Recognition (ASR) pipeline  
+**Tarix:** 2026  
 
 ---
 
 ## 1. Giriş
 
-Avtomatik Nitq Tanıma (ANT və ya ingilis dilində ASR — Automatic Speech Recognition) sistemləri insanın danışıq nitqini mətinə çevirən maşın öyrənməsi texnologiyasıdır. Bu texnologiya virtual assistentlər, tibbi transkripsiyanın avtomatlaşdırılması, alt yazı yaradılması və əlilliyi olan insanlar üçün əlçatanlıq həllərinin əsasını təşkil edir.
+Bu layihənin məqsədi Azərbaycan dili üçün işlək avtomatik nitq tanıma (ASR — Automatic Speech Recognition) pipeline qurmaqdır. Layihə çərçivəsində hazır çoxdilli Whisper modelindən istifadə edərək baza transkripsiya nəticələri əldə edilmiş, daha sonra kiçik Azərbaycan dili datası üzərində fine-tuning cəhdi aparılmışdır.
 
-Azərbaycan dili üçün ANT sistemlərinin inkişafı hələ də əhəmiyyətli dərəcədə aşağı qalır. Bunun əsas səbəbi açıq açıqlı məlumat bazalarının məhdudluğu, eləcə də dili özünəməxsus edən morfoloji xüsusiyyətlərdir. Bu layihədə Mozilla Common Voice 17.0 verilənlər bazasını istifadə edərək Whisper modelinin Azərbaycan dilindəki performansını qiymətləndirmək, kiçik həcmli fine-tuning aparılmaqla yaxşılaşdırma cəhdi etmək və nəticələri analitik cəhətdən müzakirə etmək məqsədi güdülür.
+Tapşırığın əsas məqsədi state-of-the-art nəticə əldə etmək deyil, ASR pipeline-ının texniki baxımdan düzgün qurulmasını göstərməkdir. Buna görə layihədə dataset yükləmə, audio preprocessing, model inference, WER/CER hesablanması, fine-tuning, validation WER izlənməsi və nəticələrin müqayisəsi mərhələləri həyata keçirilmişdir.
 
 ---
 
 ## 2. Dataset və Model Seçimi
 
-### Dataset
+İlkin tapşırıqda Mozilla Common Voice Azerbaijani datasetindən istifadə tövsiyə olunmuşdu. Lakin praktiki icra zamanı Common Voice-un bəzi Hugging Face versiyaları standart `datasets.load_dataset()` workflow-u ilə problemsiz yüklənmədi. Bu səbəbdən tapşırıqda icazə verilən alternativ dataset seçimi əsasında **Google FLEURS Azerbaijani** datasetindən istifadə edildi.
 
-**Mozilla Common Voice 17.0 (az)** — CC-0 lisenziyası altında paylaşılan açıq mənbəli danışıq verilənlər bazasıdır. Verilənlər könüllülər tərəfindən mikrofon vasitəsilə oxunan cümlələri ehtiva edir.
+| Xüsusiyyət | Dəyər |
+|-----------|-------|
+| Dataset | Google FLEURS |
+| Hugging Face ID | `google/fleurs` |
+| Dil konfiqurasiyası | `az_az` |
+| İstifadə olunan split | `train`, `validation`, `test` |
+| Audio preprocessing | 16 kHz sampling rate |
 
-| Parametr | Dəyər |
-|----------|-------|
-| Hugging Face ID | `mozilla-foundation/common_voice_17_0` |
-| Konfiqurasiya | `az` |
-| Audio formatı | MP3 (16 kHz-ə resampling edilir) |
-| Məzmun | Müxtəlif mövzularda qısa cümlələr |
+FLEURS datasetində Azərbaycan dili üçün oxunmuş nitq nümunələri mövcuddur. Bu dataset ASR sistemlərinin test edilməsi və kiçik fine-tuning təcrübələri üçün uyğundur.
 
-Verilənlər bazasının əsas xüsusiyyətləri:
-- Audio keyfiyyəti qeyri-bərabərdir (müxtəlif mikrofon, arka plan küy)
-- Aksent müxtəlifliyi mövcuddur (Bakı, regional dialektlər)
-- Azərbaycan dilinin xüsusi hərfləri (ə, ı, ö, ü, ç, ş, ğ) transkriptsiyalarda da əks olunur
+Model seçimi aşağıdakı kimi aparılmışdır:
 
-### Model Seçimi
+| Məqsəd | Model | Səbəb |
+|-------|-------|-------|
+| Baza qiymətləndirmə | `openai/whisper-small` | Daha güclü multilingual zero-shot ASR modeli |
+| Fine-tuning | `openai/whisper-tiny` | Daha yüngül model, məhdud resurslarda daha rahat fine-tune olunur |
 
-**OpenAI Whisper** seçilmişdir, çünki:
-1. Azərbaycan daxil 96 dildə əvvəlcədən öyrədilmiş çoxdilli modeldir
-2. Hugging Face `transformers` kitabxanası ilə tam inteqrasiya mövcuddur
-3. Decoder tərəfindən məcburi dil tokeni (`<|az|>`) dəstəklənir
-4. Pulsuz GPU-da (Google Colab T4) işləyə bilir
-
-| Rol | Model | Parametr sayı | Seçim səbəbi |
-|-----|-------|--------------|--------------|
-| Baza model | `whisper-small` | ~244M | Sıfır-shot performansı daha yaxşıdır |
-| Fine-tuning | `whisper-tiny` | ~39M | Colab-da tez işləyir, az yaddaş tələb edir |
+`whisper-small` baza model kimi seçilmişdir, çünki Azərbaycan dili üçün hazır multilingual transkripsiya imkanı verir. Fine-tuning üçün isə `whisper-tiny` istifadə edilmişdir, çünki CPU və ya pulsuz GPU mühitlərində daha sürətli işləyir.
 
 ---
 
 ## 3. Baza Model Nəticələri
 
-Baza model (`whisper-small`) heç bir əlavə öyrətmə olmadan, yalnız əvvəlcədən öyrədilmiş ağırlıqları ilə test edir.
+Baza qiymətləndirmə mərhələsində `openai/whisper-small` modeli `google/fleurs` datasetinin `az_az` konfiqurasiyasından götürülmüş 50 test nümunəsi üzərində yoxlanılmışdır.
 
-**Qiymətləndirmə parametrləri:**
-- Test nümunəsi: 50 audio
-- Split: `test`
-- Normalizasiya: kiçik hərf, durğu işarəsi silmə, boşluq normallaşması
+| Model | Dataset | Test nümunə sayı | Ortalama WER | Ortalama CER |
+|------|---------|-----------------:|--------------:|--------------:|
+| `openai/whisper-small` | `google/fleurs` (`az_az`) | 50 | **51.01%** | **15.29%** |
 
-**Nəticələr:**
+Nəticələr göstərir ki, `whisper-small` modeli Azərbaycan dili üçün cümlə strukturunu müəyyən qədər tanıya bilir, lakin söz səviyyəsində hələ də ciddi səhvlər edir. Bununla belə, CER göstəricisinin WER-dən xeyli aşağı olması modelin bir çox hallarda sözləri tamamilə itirmədiyini, daha çox fonetik və yazılış baxımından yaxın transkripsiyalar yaratdığını göstərir.
 
-| Metrika | Dəyər |
-|---------|-------|
-| Orta WER (%) | [BURAYA WER NƏTİCƏSİ ƏLAVƏ EDİLƏCƏK] |
-| Orta CER (%) | [BURAYA CER NƏTİCƏSİ ƏLAVƏ EDİLƏCƏK] |
-| Ən yaxşı nümunə WER | [BURAYA ƏLAVƏ EDİLƏCƏK] |
-| Ən pis nümunə WER | [BURAYA ƏLAVƏ EDİLƏCƏK] |
-
-> Bu dəyərlər `python part_a/evaluate_baseline.py` skripti icra edildikdən sonra `results/baseline_results.csv` faylından götürülməlidir.
-
-**Müşahidələr:**
-
-Whisper modeli Azərbaycan dilini tanısa da, aşağıdakı çatışmazlıqlar müşahidə edilmişdir:
-
-- Bəzən Azərbaycan əvəzinə türk dilinə yaxın söz formalarını yaradır (məsələn, "var" yerinə "var" yazır, amma əlavə Türk morfemi əlavə edir)
-- Xüsusi Azərbaycan hərflərini (ğ, ş, ə) bəzən latın ekvivalentləri ilə əvəz edir
-- Uzun mürəkkəb söz formlarında (aqqlütinativ strukturlar) daha çox səhv edir
+Ən yaxşı nümunələrdə WER təxminən 25–30% aralığında olmuşdur. Ən pis nümunələrdə isə WER 68–75% aralığına qədər yüksəlmişdir. Bu fərq audio keyfiyyəti, cümlə uzunluğu, fonetik mürəkkəblik və Azərbaycan dilinə məxsus səslərin tanınması ilə bağlı ola bilər.
 
 ---
 
 ## 4. Fine-tuning Yanaşması
 
-### Metodologiya
+Fine-tuning mərhələsində `openai/whisper-tiny` modeli Google FLEURS Azərbaycan dili datasından götürülmüş kiçik subset üzərində öyrədilmişdir.
 
-Fine-tuning `Seq2SeqTrainer` istifadə edərək həyata keçirilmişdir:
-
-1. Ümumi Common Voice train split-dən **200 nümunə** seçilmişdir
-2. Validation üçün **50 nümunə** (validation split-dən) istifadə edilmişdir
-3. Audio 16 kHz-ə resampling edilmişdir
-4. Log-mel spectrogram xüsusiyyətləri çıxarılmışdır
-5. Whisper tokenizer ilə mətn tokenize edilmişdir
-6. Hər epoch-da WER hesablanmış, ən yaxşı checkpoint saxlanılmışdır
-
-### Hiperparametrlər
+İstifadə olunan parametrlər:
 
 | Parametr | Dəyər |
-|----------|-------|
-| Model | `whisper-tiny` |
+|---------|-------|
+| Model | `openai/whisper-tiny` |
+| Dataset | `google/fleurs` |
+| Dil konfiqurasiyası | `az_az` |
+| Train nümunə sayı | 50 |
+| Validation nümunə sayı | 10 |
 | Epoch sayı | 3 |
-| Train batch size | 4 |
-| Gradient accumulation | 2 (effektiv batch size = 8) |
-| Öyrənmə sürəti | 1e-5 |
-| Warmup addımları | 10 |
-| Precision | FP16 (CUDA varsa) |
-| Metrika | WER (aşağı daha yaxşı) |
+| Learning rate | `1e-5` |
+| Batch size | 4 |
+| Gradient accumulation | 2 |
+| Checkpoint seçimi | Ən aşağı validation WER əsasında |
 
-### Öyrətmə Nəticələri
+Fine-tuning zamanı validation WER hər epoch üzrə izlənmişdir:
 
-| Epoch | Train Loss | Val Loss | Val WER |
-|-------|-----------|----------|---------|
-| 1 | [BURAYA ƏLAVƏ EDİLƏCƏK] | [BURAYA ƏLAVƏ EDİLƏCƏK] | [BURAYA ƏLAVƏ EDİLƏCƏK] |
-| 2 | [BURAYA ƏLAVƏ EDİLƏCƏK] | [BURAYA ƏLAVƏ EDİLƏCƏK] | [BURAYA ƏLAVƏ EDİLƏCƏK] |
-| 3 | [BURAYA ƏLAVƏ EDİLƏCƏK] | [BURAYA ƏLAVƏ EDİLƏCƏK] | [BURAYA ƏLAVƏ EDİLƏCƏK] |
+| Epoch | Validation WER |
+|------:|---------------:|
+| 1 | 96.26% |
+| 2 | 90.37% |
+| 3 | 91.44% |
 
-> Bu cədvəl `results/training_metrics.csv` faylından doldurulmalıdır.
+Ən yaxşı validation WER epoch 2-də əldə edilmişdir. Epoch 3-də WER bir qədər pisləşmişdir, bu da kiçik dataset səbəbindən modelin stabil ümumiləşdirmə aparmadığını və overfitting riskinin olduğunu göstərir.
 
 ---
 
 ## 5. Baza və Fine-tuned Model Müqayisəsi
 
-Hər iki model eyni 50 test nümunəsi üzərində qiymətləndirilmişdir.
+Fine-tuning tamamlandıqdan sonra fine-tuned `whisper-tiny` modeli eyni test splitindən götürülmüş 50 nümunə üzərində qiymətləndirilmişdir.
 
-| Model | Orta WER (%) | Orta CER (%) | Nümunə sayı |
-|-------|-------------|-------------|-------------|
-| whisper-small (baza) | [BURAYA WER ƏLAVƏ EDİLƏCƏK] | [BURAYA CER ƏLAVƏ EDİLƏCƏK] | 50 |
-| whisper-tiny (fine-tuned) | [BURAYA WER ƏLAVƏ EDİLƏCƏK] | [BURAYA CER ƏLAVƏ EDİLƏCƏK] | 50 |
-| **Fərq** | [YAXŞILAŞMA/PISLƏŞMƏ] | — | — |
+| Model | Status | Test nümunə sayı | Ortalama WER | Ortalama CER |
+|------|--------|-----------------:|--------------:|--------------:|
+| `openai/whisper-small` | Zero-shot baseline | 50 | **51.01%** | **15.29%** |
+| `openai/whisper-tiny` | 50 train nümunəsi ilə fine-tune edilmiş | 50 | **84.66%** | **34.61%** |
 
-> Qeyd: Bu cədvəl `results/comparison.csv` faylından doldurulmalıdır. Vizual müqayisə üçün `results/wer_cer_comparison.png` sxeminə baxın.
+Fine-tuned model baza modeldən daha zəif nəticə göstərmişdir. Bu nəticə gözlənilməz deyil, çünki müqayisə edilən modellərin ölçüləri fərqlidir: baseline üçün daha böyük `whisper-small`, fine-tuning üçün isə daha kiçik `whisper-tiny` istifadə edilmişdir. Bundan əlavə, fine-tuning yalnız 50 train nümunəsi ilə aparılmışdır ki, bu da modelin Azərbaycan dili üçün yaxşı ümumiləşdirmə öyrənməsi üçün kifayət deyil.
 
-**Gözlənilən nəticə:** Fine-tuned `whisper-tiny` modelinin WER göstəricisinin baza `whisper-small` modelindən yaxşı olması çox güman deyil, çünki:
-- `whisper-tiny` daha az parametrə malikdir (39M vs 244M)
-- Yalnız 200 nümunə ilə öyrədilmişdir — bu çox azdır
-- Baza model artıq Azərbaycan dilinə köklənmişdir
-
-Bu müqayisənin məqsədi fine-tuning prosedurunun düzgün işlədiyini göstərməkdir — böyük irəliləyiş nümayiş etdirmək deyil.
+Bu mərhələnin əsas dəyəri nəticənin mütləq yaxşılaşması deyil, fine-tuning pipeline-ının işləməsini göstərməkdir: data hazırlığı, feature extraction, tokenization, training, validation WER izlənməsi, checkpoint saxlanması və nəticələrin baza model ilə müqayisəsi uğurla həyata keçirilmişdir.
 
 ---
 
 ## 6. Çətinliklər və Həllər
 
-### Texniki Problemlər
+### 6.1. Dataset yükləmə problemi
 
-**Problem 1: Transformers versiya uyğunsuzluğu**
-Transformers kitabxanasının müxtəlif versiyalarında `evaluation_strategy` parametri `eval_strategy` kimi dəyişdirilmişdir. Bu, `Seq2SeqTrainer` yaradılarkən xəta verir.
+Əsas çətinliklərdən biri Mozilla Common Voice datasetinin bəzi Hugging Face versiyalarının standart `load_dataset()` ilə yüklənməməsi oldu. Bu problem layihənin əvvəlində Common Voice əvəzinə alternativ dataset seçilməsini tələb etdi.
 
-*Həll:* Skriptdə dinamik parametr yoxlaması tətbiq edilmişdir — parametr adı runtime zamanı müəyyən edilir.
+**Həll:** Tapşırıqda “və ya istənilən dataset” icazəsi olduğu üçün Google FLEURS Azerbaijani datasetindən istifadə edildi. Bu dataset Hugging Face üzərindən yükləndi və `az_az` konfiqurasiyası ilə işlədildi.
 
-**Problem 2: Audio resampling**
-Common Voice faylları 48 kHz formatında olur, Whisper isə 16 kHz tələb edir. Avtomatik cast edilmədikdə keyfiyyət itkisi baş verir.
+### 6.2. Dataset language və Whisper language fərqi
 
-*Həll:* `datasets.Audio(sampling_rate=16000)` ilə `.cast_column()` metodu istifadə edilmişdir.
+FLEURS datasetində Azərbaycan dili konfiqurasiyası `az_az` kimi verilir. Lakin Whisper modeli decoding üçün `az_az` yox, `azerbaijani` language adını gözləyir. Bu fərq əvvəlcə boş prediction-lara və səhv nəticələrə səbəb oldu.
 
-**Problem 3: Azərbaycan hərflərinin normalizasiyası**
-`str.translate()` ilə standart durğu işarəsi silmə `ğ`, `ş`, `ə` kimi xüsusi hərfləri silib atır.
+**Həll:** Kodda ayrıca mapping funksiyası əlavə edildi:
 
-*Həll:* Unicode kateqoriyası əsasında filtrasiya tətbiq edilmişdir — yalnız `P*` (Punctuation) kateqoriyası silinir, `L*` (Letter) kateqoriyası qorunur.
+```text
+az_az -> azerbaijani
+az -> azerbaijani
+```
 
-**Problem 4: Yaddaş məhdudiyyəti (Colab T4)**
-İki böyük modeli eyni vaxtda yükləmək T4 GPU-nun 15 GB limitini aşır.
+Bu düzəlişdən sonra model normal transkripsiya yaratmağa başladı.
 
-*Həll:* `compare_models.py` skriptində modelləri ardıcıl yükləyir, hər qiymətləndirmədən sonra GPU yaddaşı `torch.cuda.empty_cache()` ilə boşaldılır.
+### 6.3. Reference column fərqi
 
-### Azərbaycan Dilinin Xüsusi Çətinlikləri
+Common Voice datasetində reference mətn adətən `sentence` column-da olur. FLEURS datasetində isə reference mətn `transcription` və ya `raw_transcription` column-larında ola bilər.
 
-**Açıq Audio Datasının Məhdudluğu:**
-Azərbaycan dili üçün keyfiyyətli audio dataset demək olar ki, mövcud deyil. Mozilla Common Voice-da Azərbaycan nitqi üçün cəmi ~14 saat audio var. Bu, Whisper-in öyrədiyi ingilis dilinin (680+ saat) yanında çox azdır. Modelin pre-training zamanı az Azərbaycan məlumatı gördüyü üçün zero-shot performansı aşağı olur.
+**Həll:** Kodda universal reference extraction funksiyası yazıldı. Funksiya aşağıdakı column-ları ardıcıllıqla yoxlayır:
 
-**Aksent və Dialekt Fərqləri:**
-Azərbaycanda bölgəvi dialektlər (Bakı, Gəncə, Naxçıvan, Şəki) fonetik cəhətdən əhəmiyyətli dərəcədə fərqlənir. Common Voice dataseti əsasən standart Bakı aksenti ilə məhdudlaşır. Dialektli nitq üçün model xüsusilə pis nəticə verir.
+```text
+sentence
+transcription
+raw_transcription
+text
+```
 
-**Ses-küy və Qeyri-stabil Audio Keyfiyyəti:**
-Könüllülər tərəfindən mikrofon vasitəsilə yazılan audiolar çox vaxt arxa plan küyü, reverb, hava küyü ehtiva edir. Bəzi audio fayllar tamamilə anlaşılmazdır. Hər bir audio keyfiyyəti fərqli olduğu üçün model bəzi nümunələrdə çox yaxşı, digərlərində çox pis nəticə verir.
+Bu yanaşma kodu həm Common Voice, həm də FLEURS üçün daha çevik edir.
 
-**Xüsusi Azərbaycan Hərfləri:**
-Azərbaycan əlifbasında `ə`, `ı`, `ö`, `ü`, `ç`, `ş`, `ğ` hərfləri var. Whisper bu hərfləri bəzən oxşar latın hərfləri ilə əvəz edir (`ə` → `e`, `ş` → `s`, `ğ` → `g`). Bu, WER hesabında böyük kimi görünmür (bir hərf dəyişir), amma CER dəqiqliyini əhəmiyyətli dərəcədə aşağı salır. Xüsusilə sözün mənasını dəyişən hallarda bu ciddi problem yaradır.
+### 6.4. Məhdud resurs problemi
 
-**Aqqlütinativ Söz Quruluşu:**
-Azərbaycan dilinin aqqlütinativ xüsusiyyəti söz köküünə çoxlu şəkilçilərin əlavə edilməsini nəzərdə tutur. Məsələn: `ev` (ev) → `evlərinizdəkilərdən` (evlərinizdəkilərdən). Bir sözkökünə düzgün şəkilçi əlavə etmək model üçün çox çətindir. Bu cür uzun söz formalarında WER bütöv bir nümunə üçün 1.0-a çata bilir, halbuki modelin yalnız bir şəkilçisi yanlışdır.
+Fine-tuning CPU mühitində aparıldığı üçün dataset ölçüsü kiçik saxlanıldı. 50 train və 10 validation nümunəsi ilə training texniki olaraq mümkün oldu, lakin performans baxımından kifayət qədər güclü nəticə vermədi.
 
-**Türk Dilinə Yaxınlıq Problemi:**
-Whisper bəzən Azərbaycan sözlərini türk dili variantı ilə əvəz edir, çünki hər iki dil fonetik cəhətdən çox yaxındır və Türk dilinə aid daha çox öyrətmə məlumatı mövcuddur. Məsələn, Azərbaycan dilindəki "getmək" sözü əvəzinə Türkcə `gitmek` yazılabilər. Bu xüsusən model dil tokeni düzgün verilmədikdə baş verir.
+**Həll:** Kiçik subset istifadə edildi, epoch sayı məhdud saxlanıldı və validation WER izlənərək ən yaxşı checkpoint seçildi.
 
 ---
 
-## 7. Nəticələrin Təhlili
+## 7. Azərbaycan Dilinin ASR üçün Yaratdığı Çətinliklər
 
-### WER/CER Nəticələri Yaxşıdırmı?
+Azərbaycan dili ASR üçün bir neçə səbəbə görə çətinlik yaradır:
 
-[BURAYA WER NƏTİCƏSİ ƏLAVƏ EDİLDİKDƏN SONRA YAZILACAQ]
-
-Ümumi olaraq, Azərbaycan dili üçün zero-shot Whisper modelindən **60–85% WER** gözlənilir. Bu yüksək görünür, amma kontekstdə qiymətləndirildikdə:
-- Azərbaycan üçün xüsusi öyrədilmiş model demək olar ki, yoxdur
-- Common Voice dataseti çox keyfiyyətsiz audio nümunələrini ehtiva edir
-- Aqqlütinativ söz quruluşu word-level metrikaları şişirdir
-
-CER adətən WER-dən aşağı olur, çünki model çox vaxt düzgün söz köküünü tapır, amma şəkilçini yanlış edir.
-
-### Model Hansı Tip Səhvlər Edir?
-
-1. **Şəkilçi səhvləri:** Sözkökü düzgün, amma qrammatik şəkilçi yanlışdır
-2. **Dil qarışması:** Azərbaycan sözləri yerinə türkçə ekvivalentlər
-3. **Xüsusi hərflər:** `ə→e`, `ş→s`, `ğ→g` əvəzləmələri
-4. **Silinmə:** Uzun sözlər tamamilə buraxılır
-5. **Əlavə söz:** Model olmayan sözlər əlavə edir (hallucination)
-
-### Hansı Audio Şəraitlərində Daha Yaxşı İşləyir?
-
-**Daha yaxşı nəticə:**
-- Sakit fon, yaxın mikrofon
-- Qısa, sadə cümlələr
-- Aydın tələffüz, lent sürəti normal
-- Standart Bakı aksenti
-
-**Daha pis nəticə:**
-- Arxa plan küyü (küçə, ev mühiti)
-- Uzaq mikrofon (reverb)
-- Dialektli nitq
-- Çox uzun cümlələr (30+ söz)
-- Sürətli danışıq tempi
+1. **Low-resource problem:** Azərbaycan dili üçün açıq və keyfiyyətli labeled speech data ingilis, fransız və ya ispan dili ilə müqayisədə daha azdır.
+2. **Aqqlütinativ quruluş:** Azərbaycan dilində sözlər şəkilçilər vasitəsilə çox müxtəlif formalara düşə bilir. Bu, WER-i artırır.
+3. **Xüsusi hərflər:** `ə`, `ı`, `ö`, `ü`, `ç`, `ş`, `ğ` kimi hərflər model tərəfindən bəzən qarışdırılır.
+4. **Fonetik yaxınlıqlar:** `x/q`, `ə/e`, `ı/i`, `ç/c` kimi yaxın səslər model üçün qarışıqlıq yarada bilər.
+5. **Aksent və danışıq fərqləri:** Müxtəlif bölgələrdən olan danışanların tələffüz fərqləri model performansına təsir edə bilər.
+6. **Audio şəraiti:** Mikrofon keyfiyyəti, fon səs-küyü və danışıq sürəti nəticələri dəyişir.
 
 ---
 
-## 8. Yaxşılaşdırma Yolları
+## 8. Nəticələrin Təhlili
 
-### Production Üçün Nə Etmək Lazımdır?
+Baza model üçün WER 51.01%, CER isə 15.29% olmuşdur. Bu nəticə production səviyyəsi üçün kifayət qədər yaxşı deyil, lakin zero-shot multilingual model üçün məqbul başlanğıc nəticə hesab edilə bilər.
 
-1. **Böyük dataset:** Ən azı 1000+ saat keyfiyyətli Azərbaycan nitqi lazımdır. Bu, dövlət yayımçıları (İctimai TV, Region TV), universitetlər və ya kommersiya TTS sistemlərindən toplana bilər.
+CER-in WER-dən xeyli aşağı olması vacib müşahidədir. Bu onu göstərir ki, model çox vaxt cümləni tamamilə səhv yaratmır, lakin sözlərin yazılışında və fonetik formasında səhvlər edir.
 
-2. **Daha böyük model fine-tuning:** `whisper-medium` və ya `whisper-large-v3` modeli tam dataset üzərində fine-tune edilməlidir. Bu, 40–60 GB VRAM tələb edir (A100 və ya H100 GPU).
+Modelin tipik səhvləri:
 
-3. **Data artırımı:** Sürət dəyişdirmə (0.9x–1.1x), SpecAugment, arxa plan küyü əlavəsi, reverb simulyasiyası — bu texnikalar az datayla daha yaxşı generalizasiya verir.
+- fonetik oxşar sözlərin qarışdırılması;
+- Azərbaycan dilinə məxsus hərflərin səhv yazılması;
+- rəqəm və tarixlərin fərqli formada transkripsiyası;
+- uzun cümlələrdə bəzi sözlərin buraxılması;
+- bəzi sözlərin türk dilinə və ya fonetik oxşar formaya yaxınlaşdırılması.
 
-4. **Dil modeli inteqrasiyası:** n-gram və ya transformer dil modelini beam search ilə birləşdirmək WER-i 10–20% azalda bilər.
-
-5. **Azərbaycan spesifik tokenizer:** Mövcud Whisper tokenizer Azərbaycan morfologiyasına optimallaşdırılmamışdır. Subword tokenization (BPE) Azərbaycan şəkilçilərinə uyğunlaşdırılmalıdır.
-
-### Daha Çox Resurs Olsaydı, Növbəti 3 Addım
-
-1. **`whisper-large-v3`-ü tam Common Voice Azərbaycan dataseti üzərində 10–20 epoch fine-tuning etmək** — bu tək addım ən böyük WER yaxşılaşmasını verər
-
-2. **Kommersial TTS-dən sintez edilmiş Azərbaycan nitqi əlavə etmək** — real audio az olduğu üçün sintez edilmiş audio dataseti artırmaq üçün istifadə edilə bilər
-
-3. **Decoder-only language model (GPT-2 Azərbaycan) öyrədib Whisper ilə hibrid sistemə çevirmək** — bu, qrammatik düzgünlüyü kəskin artıra bilər
-
-### Azərbaycan Dili Üçün ASR-ın Ən Böyük Problemi
-
-**Azərbaycan dili üçün ASR-ın ən böyük problemi açıq, böyük həcmli, keyfiyyətli audio verilənlər bazasının olmamasıdır** — texnologiya mövcuddur, amma onu effektiv öyrətmək üçün kifayət qədər məlumat yoxdur.
+Fine-tuned `whisper-tiny` modelinin nəticəsi daha zəif olmuşdur: WER 84.66%, CER 34.61%. Bu, kiçik dataset və kiçik model ölçüsü ilə izah olunur. Bu nəticə fine-tuning prosesinin uğursuz olduğu anlamına gəlmir; əksinə, kiçik datasetlə fine-tuning-in kifayət etmədiyini göstərən praktik eksperimentdir.
 
 ---
 
-## 9. Nəticə
+## 9. Hansı Audio Şəraitlərində Model Daha Yaxşı və Daha Pis İşləyir?
 
-Bu layihədə Azərbaycan dili üçün tam bir ANT pipeline qurulmuş, OpenAI Whisper modelinin zero-shot performansı qiymətləndirilmiş və kiçik həcmli fine-tuning cəhdi aparılmışdır.
+Model daha yaxşı işləyir:
 
-**Əsas nəticələr:**
+- aydın və sakit mühitdə yazılmış audio nümunələrində;
+- qısa və sadə cümlələrdə;
+- standart tələffüzə yaxın nitqdə;
+- az sayda xüsusi ad və rəqəm olan cümlələrdə.
 
-- Whisper, əvvəlcədən öyrədilmiş halda belə, Azərbaycan nitqini müəyyən dərəcədə tanıya bilir, lakin nəticələr produksiya üçün hələ hazır deyil.
-- Azərbaycan dilinin aqqlütinativ quruluşu, xüsusi hərfləri və məhdud açıq audio dataseti ASR sistemlərinin inkişafını çətinləşdirir.
-- Kiçik fine-tuning cəhdi pipeline-ın düzgün işlədiyini sübut edir, lakin 200 nümunə ilə əhəmiyyətli yaxşılaşma əldə etmək mümkün deyil.
-- Azərbaycan üçün produksiya səviyyəli ASR sistemi qurmaq üçün daha böyük dataset, daha güclü GPU resursları və çoxillik araşdırma lazımdır.
+Model daha pis işləyir:
 
-Bu layihə texniki biliyin mövcud resurslar çərçivəsində necə tətbiq edilə biləcəyini nümayiş etdirir. Nəticələr mükəmməl olmasa da, metodologiya düzgün, kod təmiz və yenidən istifadəyə uyğundur.
+- uzun və mürəkkəb cümlələrdə;
+- rəqəmlər, tarixlər və xüsusi adlar olan nümunələrdə;
+- fonetik baxımdan yaxın sözlərin çox olduğu cümlələrdə;
+- qeyri-standart tələffüz və səs-küy olan audioda;
+- Azərbaycan dilinə məxsus səslərin çox olduğu ifadələrdə.
 
 ---
 
-*Hesabat `report.md` faylında saxlanılır. Nəticələr skriptlər icra edildikdən sonra `[BURAYA ... ƏLAVƏ EDİLƏCƏK]` yer tutucuları ilə əvəz edilməlidir.*
+## 10. Yaxşılaşdırma Yolları
+
+Bu pipeline-ı production səviyyəsinə çatdırmaq üçün aşağıdakı addımlar vacibdir:
+
+1. **Daha böyük Azərbaycan dili datasetindən istifadə:** Minlərlə saatlıq müxtəlif danışanlardan toplanmış audio və dəqiq transkripsiyalar lazımdır.
+2. **Daha böyük Whisper modelini fine-tune etmək:** `whisper-small`, `whisper-medium` və ya daha böyük modellər Azərbaycan dili üçün fine-tune edilə bilər.
+3. **Data augmentation:** Noise injection, speed perturbation və SpecAugment kimi metodlarla modelin robustluğu artırıla bilər.
+4. **Text normalization:** Rəqəmlər, tarixlər, xüsusi adlar və durğu işarələri üçün daha güclü normalization pipeline qurulmalıdır.
+5. **Dialect və accent coverage:** Müxtəlif bölgələrdən danışanların nitqi datasetə daxil edilməlidir.
+6. **Evaluation genişləndirilməsi:** Yalnız WER/CER deyil, səhv tiplərinə görə ayrıca analiz də aparılmalıdır.
+
+Daha çox resurs olsaydı, növbəti 3 addım belə olardı:
+
+1. Daha böyük və balanslaşdırılmış Azərbaycan dili speech dataset toplamaq və ya mövcud datasetləri birləşdirmək.
+2. `whisper-small` və ya `whisper-medium` modelini GPU üzərində daha uzun fine-tune etmək.
+3. Rəqəm, tarix, xüsusi ad və Azərbaycan hərfləri üçün ayrıca post-processing və normalization sistemi qurmaq.
+
+---
+
+## 11. Azərbaycan dili üçün ASR-ın ən böyük problemi
+
+Azərbaycan dili üçün ASR-ın ən böyük problemi yüksək keyfiyyətli, müxtəlif aksentləri və real audio şəraitlərini əhatə edən böyük labeled speech datasetlərinin məhdud olmasıdır.
+
+---
+
+## 12. Nəticə
+
+Bu layihədə Azərbaycan dili üçün işlək ASR pipeline qurulmuşdur. Baza model kimi `openai/whisper-small` istifadə edilmiş və 50 test nümunəsi üzərində WER 51.01%, CER 15.29% nəticəsi əldə edilmişdir. Fine-tuning mərhələsində `openai/whisper-tiny` modeli 50 train nümunəsi üzərində 3 epoch öyrədilmiş və test nəticəsi WER 84.66%, CER 34.61% olmuşdur.
+
+Fine-tuned model baza modeldən zəif nəticə göstərsə də, layihə texniki baxımdan əsas tələbləri yerinə yetirir: dataset hazırlığı, inference, WER/CER hesablanması, fine-tuning cəhdi, validation WER izlənməsi, checkpoint saxlanması və nəticələrin müqayisəsi həyata keçirilmişdir.
+
+Gələcəkdə daha böyük dataset, daha güclü model, GPU resursları və daha yaxşı text normalization ilə Azərbaycan dili üçün daha keyfiyyətli ASR sistemi qurmaq mümkündür.
